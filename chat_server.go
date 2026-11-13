@@ -17,10 +17,23 @@ type usuario struct {
 	bot     bool
 }
 
+type privada struct {
+	de, para, texto string
+	resposta        chan string
+}
+
+type troca struct {
+	u        *usuario
+	novo     string
+	resposta chan string
+}
+
 var (
 	entering = make(chan client)
 	leaving  = make(chan client)
 	messages = make(chan string)
+	privadas = make(chan privada)
+	trocas   = make(chan troca)
 )
 
 var (
@@ -38,6 +51,49 @@ func broadcaster() {
 			}
 		}
 		mu.Unlock()
+	}
+}
+
+func entregador() {
+	for p := range privadas {
+		msg := "@" + p.de + " disse em privado: " + p.texto
+
+		mu.Lock()
+		dest, existe := usuarios[p.para]
+		if existe {
+			dest.ch <- msg
+		}
+		mu.Unlock()
+
+		if !existe {
+			p.resposta <- "Erro: usuário @" + p.para + " não encontrado"
+			continue
+		}
+
+		fmt.Println(msg)
+		p.resposta <- ""
+	}
+
+}
+
+func trocador() {
+	for t := range trocas {
+		mu.Lock()
+		if _, existe := usuarios[t.novo]; existe {
+			mu.Unlock()
+			t.resposta <- "Erro: Este nick já está em uso"
+			continue
+		}
+		antigo := t.u.apelido
+		delete(usuarios, antigo)
+		t.u.apelido = t.novo
+		usuarios[t.novo] = t.u
+		mu.Unlock()
+
+		anuncio := "Usuário @" + antigo + " agora é @" + t.novo
+		fmt.Println(anuncio)
+		publicas <- anuncio
+		t.resposta <- ""
 	}
 }
 
@@ -68,7 +124,7 @@ func handleConn(conn net.Conn) {
 	publicas <- anuncio_entrada
 
 	for input.Scan() {
-		cmd, resto, _ := strings.Cut(input.Text(), "")
+		cmd, resto, _ := strings.Cut(input.Text(), " ")
 		if cmd == "/exit" {
 			break
 		}
@@ -134,7 +190,7 @@ func identificar(input *bufio.Scanner, ch chan string) *usuario {
 
 		// verifica se ja existe
 		u := &usuario{apelido: apelido, ch: ch, bot: cmd == `/bot`}
-		if registrar(u) {
+		if !registrar(u) {
 			ch <- `Erro: este apelido já está em uso`
 			continue
 		}
