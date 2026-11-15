@@ -133,13 +133,28 @@ func handleConn(conn net.Conn) {
 		case "/msg":
 
 			if strings.HasPrefix(resto, "@") {
-
+				para, texto, _ := strings.Cut(strings.TrimPrefix(resto, "@"), " ")
+				if texto != "" {
+					resposta := make(chan string)
+					privadas <- privada{de: u.apelido, para: para, texto: texto, resposta: resposta}
+					if erro := <-resposta; erro != "" {
+						ch <- erro
+					}
+				}
 			} else if resto != "" {
 				publicas <- "@" + u.apelido + ": " + resto
 			}
 
-		case "/changenick":
-
+		case `\changenick`:
+			if !apelidoValido(resto) {
+				ch <- "Erro: apelido inválido"
+			} else {
+				resposta := make(chan string)
+				trocas <- troca{u: u, novo: resto, resposta: resposta}
+				if erro := <-resposta; erro != "" {
+					ch <- erro
+				}
+			}
 		}
 	}
 
@@ -209,6 +224,8 @@ func main() {
 	}
 	fmt.Println("Portas abertas!")
 	go broadcaster()
+	go entregador()
+	go trocador()
 	for {
 		conn, err := listener.Accept()
 		if err != nil {
