@@ -125,12 +125,12 @@ func handleConn(conn net.Conn) {
 
 	for input.Scan() {
 		cmd, resto, _ := strings.Cut(input.Text(), " ")
-		if cmd == "/exit" {
+		if cmd == `\exit` {
 			break
 		}
 
 		switch cmd {
-		case "/msg":
+		case `\msg`:
 
 			if strings.HasPrefix(resto, "@") {
 				para, texto, _ := strings.Cut(strings.TrimPrefix(resto, "@"), " ")
@@ -184,16 +184,16 @@ func remover(u *usuario) {
 }
 
 func apelidoValido(apelido string) bool {
-	return apelido != "" && !strings.ContainsAny(apelido, ` @/`)
+	return apelido != "" && !strings.ContainsAny(apelido, ` @\`)
 }
 
 func identificar(input *bufio.Scanner, ch chan string) *usuario {
 	for input.Scan() {
 		// primeiro pega o valor
 		cmd, apelido, _ := strings.Cut(input.Text(), " ")
-		if cmd != "/bot" && cmd != "/user" { // se nao for nenhuma das opcoes
+		if cmd != `\bot` && cmd != `\user` { // se nao for nenhuma das opcoes
 			// escreva no channel
-			ch <- `Erro: Identifique-se comm /user <apelido>`
+			ch <- `Erro: Identifique-se comm \user <apelido>`
 			continue
 		}
 
@@ -204,7 +204,7 @@ func identificar(input *bufio.Scanner, ch chan string) *usuario {
 		}
 
 		// verifica se ja existe
-		u := &usuario{apelido: apelido, ch: ch, bot: cmd == `/bot`}
+		u := &usuario{apelido: apelido, ch: ch, bot: cmd == `\bot`}
 		if !registrar(u) {
 			ch <- `Erro: este apelido já está em uso`
 			continue
